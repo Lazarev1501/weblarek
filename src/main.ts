@@ -53,6 +53,10 @@ buyer.setData({
   phone: '+79991234567',
 });
 
+buyer.clear();
+console.log('Покупатель после очистки:', buyer.getData());
+console.log('Ошибки после очистки:', buyer.validate());
+
 console.log('Покупатель:', buyer.getData());
 console.log('Ошибки:', buyer.validate());
 

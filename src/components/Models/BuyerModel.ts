@@ -30,7 +30,7 @@ export class BuyerModel {
 
   getData(): Partial<IBuyer> {
     return {
-      payment: this.payment ?? undefined,
+      payment: this.payment,
       email: this.email,
       phone: this.phone,
       address: this.address,
