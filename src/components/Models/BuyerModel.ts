@@ -4,11 +4,15 @@ import {
   TValidationErrors,
 } from '../../types';
 
+import { IEvents } from '../base/Events';
+
 export class BuyerModel {
   protected payment: TPayment | null = null;
   protected email = '';
   protected phone = '';
   protected address = '';
+
+  constructor(private events: IEvents) {}
 
   setData(data: Partial<IBuyer>): void {
     if (data.payment !== undefined) {
@@ -26,9 +30,11 @@ export class BuyerModel {
     if (data.address !== undefined) {
       this.address = data.address;
     }
+
+    this.events.emit('buyer:changed');
   }
 
-  getData(): Partial<IBuyer> {
+  getData(): IBuyer {
     return {
       payment: this.payment,
       email: this.email,
@@ -42,6 +48,8 @@ export class BuyerModel {
     this.email = '';
     this.phone = '';
     this.address = '';
+
+    this.events.emit('buyer:changed');
   }
 
   validate(): TValidationErrors {

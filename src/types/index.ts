@@ -42,3 +42,56 @@ export interface IOrderResult {
     id: string;
     total: number;
 }
+
+export interface HeaderData {
+    counter: number;
+}
+
+export interface GalleryData {
+    catalog: HTMLElement[];
+}
+
+export interface ICardActions {
+    onClick(event: MouseEvent): void;
+}
+
+export interface IBasketView {
+    items: HTMLElement[];
+    total: number;
+}
+
+export interface IModalData {
+    content: HTMLElement;
+}
+
+export interface IFormState {
+    valid: boolean;
+    errors: string;
+}
+
+export interface IOrderForm {
+    payment: TPayment;
+    address: string;
+}
+
+export interface IContactsForm {
+    email: string;
+    phone: string;
+}
+
+export interface ISuccessData {
+    total: number;
+}
+
+export interface ISuccessActions {
+    onClick(): void;
+}
+
+export interface IOrderData {
+	payment: string;
+	address: string;
+	email: string;
+	phone: string;
+	items: string[];
+	total: number;
+}
