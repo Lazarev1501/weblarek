@@ -3,47 +3,45 @@ import { Card } from './Card';
 import { ensureElement } from '../../utils/utils';
 import { IEvents } from '../base/Events';
 
+type PreviewData = IProduct & { inBasket?: boolean };
+
 export class PreviewCard extends Card {
-	protected descriptionElement: HTMLElement;
-	protected buttonElement: HTMLButtonElement;
+	private button: HTMLButtonElement;
+	private description: HTMLElement;
+	private id: string = '';
 
-	protected productId!: string;
-
-	constructor(
-		container: HTMLElement,
-		protected events: IEvents
-	) {
+	constructor(container: HTMLElement, protected events: IEvents) {
 		super(container);
 
-		this.descriptionElement = ensureElement(
-			'.card__text',
+		this.button = ensureElement<HTMLButtonElement>(
+			'.card__button',
 			container
 		);
 
-		this.buttonElement = ensureElement<HTMLButtonElement>(
-	    '.card__button',
-	    container
-    );
+		this.description = ensureElement('.card__text', container);
 
-		this.buttonElement.addEventListener('click', () => {
-      this.events.emit('basket:add', {
-        id: this.productId
-      });
-    });
+		this.button.addEventListener('click', () => {
+			if (!this.id) return;
+
+			this.events.emit('basket:toggle', { id: this.id });
+		});
 	}
 
-	set description(value: string) {
-		this.descriptionElement.textContent = value;
-	}
+	render(data: PreviewData): HTMLElement {
+		this.id = data.id;
+		this.container.dataset.id = data.id;
 
-	render(data: IProduct): HTMLElement {
-		this.productId = data.id;
+		this.description.textContent = data.description;
+
+		this.button.textContent = data.inBasket
+			? 'Удалить из корзины'
+			: 'В корзину';
 
 		return super.render({
 			title: data.title,
 			image: data.image,
 			price: data.price,
-			description: data.description
+			category: data.category,
 		});
 	}
 }

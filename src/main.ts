@@ -25,173 +25,206 @@ import { Success } from './components/views/Success';
 import { cloneTemplate } from './utils/utils';
 import { API_URL } from './utils/constants';
 
+import { IProduct } from './types';
+
 const events = new EventEmitter();
 
-const orderForm = new OrderForm(cloneTemplate('#order'), events);
-
-// MODELS
+// ================= MODELS =================
 const catalog = new CatalogModel(events);
 const basket = new BasketModel(events);
 const buyer = new BuyerModel(events);
 
-// API
+// ================= API =================
 const api = new Api(API_URL);
 const webLarekApi = new WebLarekApi(api);
 
-// VIEWS
+// ================= VIEWS =================
 const header = new Header(document.querySelector('.header')!, events);
 const gallery = new Gallery(document.querySelector('.gallery')!);
 const modal = new Modal(document.querySelector('#modal-container')!, events);
 
-// basket view 
-const basketView = new BasketView(cloneTemplate('#basket'), events);
+const basketView = new BasketView(
+	cloneTemplate('#basket'),
+	events
+);
 
-// STATE
-let orderData: any = {};
+// ================= STATE =================
+let currentPreview: IProduct | null = null;
 
-// ================= CATALOG =================
-events.on('catalog:changed', () => {
+// ================= RENDER =================
+
+function renderGallery() {
 	const cards = catalog.getProducts().map(product => {
-		const card = new CatalogCard(cloneTemplate('#card-catalog'), events);
-		return card.render(product);
+		const card = new CatalogCard(
+			cloneTemplate('#card-catalog'),
+			events
+		);
+
+		return card.render({
+			...product,
+			inBasket: basket.hasProduct(product.id),
+		});
 	});
 
 	gallery.catalog = cards;
-});
+}
 
-// ================= SELECT PRODUCT =================
-events.on('card:select', (card: CatalogCard) => {
-	const product = catalog.getProduct(card.id);
-	if (!product) return;
-
-	const preview = new PreviewCard(cloneTemplate('#card-preview'), events);
-
-	modal.render({
-		content: preview.render(product)
-	});
-});
-
-// ================= BASKET =================
-events.on<{ id: string }>('basket:add', ({ id }) => {
-	const product = catalog.getProduct(id);
-	if (!product) return;
-
-	basket.addProduct(product);
-	modal.close();
-});
-
-events.on<{ id: string }>('basket:remove', ({ id }) => {
-	basket.removeById(id);
-
+function renderBasket() {
 	const items = basket.getProducts().map(product => {
-		const item = new BasketItem(cloneTemplate('#card-basket'), events);
+		const item = new BasketItem(
+			cloneTemplate('#card-basket'),
+			events
+		);
+
 		return item.render(product);
 	});
 
-	basketView.render({
-		items,
-		total: basket.getTotal()
-	});
+	basketView.items = items;
+	basketView.total = basket.getTotal();
+}
 
-	modal.render({ content: basketView.render() });
-});
+// ================= INIT =================
 
-events.on('basket:open', () => {
-	const items = basket.getProducts().map(product => {
-		const item = new BasketItem(cloneTemplate('#card-basket'), events);
-		return item.render(product);
-	});
+webLarekApi.getProducts()
+	.then(data => catalog.setProducts(data.items))
+	.catch(console.error);
 
-	basketView.render({
-		items,
-		total: basket.getTotal()
-	});
+// ================= GLOBAL SYNC =================
 
-	modal.render({ content: basketView.render() });
-});
-
+// 🔥 ЕДИНЫЙ источник обновления UI
 events.on('basket:changed', () => {
+	renderBasket();
+	renderGallery();
 	header.counter = basket.getCount();
 });
 
-// ================= FORMS =================
+// ================= CATALOG =================
 
-type FormChangeEvent = {
-	field: string;
-	value: string;
-};
+events.on('catalog:changed', renderGallery);
 
-type OrderPaymentEvent = {
-	type: string;
-};
+// ================= CARD =================
 
-events.on('form:change', (data: FormChangeEvent) => {
-	const { field, value } = data;
+events.on<{ id: string }>('card:select', ({ id }) => {
+	const product = catalog.getProduct(id);
+	if (!product) return;
 
-	orderData[field] = value;
-	buyer.setData(orderData);
-});
+	currentPreview = product;
 
-events.on('order:payment', (data: OrderPaymentEvent) => {
-	orderData.payment = data.type;
-});
-
-events.on('form:submit', () => {
-	if (!orderData.payment || !orderData.address) return;
+	const preview = new PreviewCard(
+		cloneTemplate('#card-preview'),
+		events
+	);
 
 	modal.render({
-		content: new ContactsForm(cloneTemplate('#contacts'), events).render()
+		content: preview.render({
+			...product,
+			inBasket: basket.hasProduct(product.id),
+		}),
 	});
+});
+
+// ================= BASKET TOGGLE =================
+
+events.on<{ id: string }>('basket:toggle', ({ id }) => {
+	const product = catalog.getProduct(id);
+	if (!product) return;
+
+	if (basket.hasProduct(id)) {
+		basket.removeById(id);
+	} else {
+		basket.addProduct(product);
+	}
+
+	// обновляем preview если открыт
+	if (currentPreview) {
+		const preview = new PreviewCard(
+			cloneTemplate('#card-preview'),
+			events
+		);
+
+		modal.render({
+			content: preview.render({
+				...currentPreview,
+				inBasket: basket.hasProduct(currentPreview.id),
+			}),
+		});
+	}
+});
+
+// ================= BASKET OPEN =================
+
+events.on('basket:open', () => {
+	modal.render({
+		content: basketView.render(),
+	});
+});
+
+// ================= REMOVE =================
+
+events.on<{ id: string }>('basket:remove', ({ id }) => {
+	basket.removeById(id);
 });
 
 // ================= ORDER FLOW =================
-events.on('order:contacts', () => {
-	const form = new ContactsForm(cloneTemplate('#contacts'), events);
 
+events.on('order:open', () => {
 	modal.render({
-		content: form.render()
+		content: new OrderForm(
+			cloneTemplate('#order'),
+			events
+		).render(),
 	});
 });
 
+events.on('order:next', () => {
+	modal.render({
+		content: new ContactsForm(
+			cloneTemplate('#contacts'),
+			events
+		).render(),
+	});
+});
+
+// ================= FORM =================
+
+events.on<{ field: string; value: string }>('form:change', ({ field, value }) => {
+	buyer.setField(field as any, value);
+});
+
+// ================= PAYMENT =================
+
+events.on<{ type: 'card' | 'cash' }>('order:payment', ({ type }) => {
+	buyer.setPayment(type);
+});
+
+// ================= ORDER SEND =================
+
 events.on('order:send', () => {
-	if (!orderData.email || !orderData.phone) return;
+	if (!buyer.isContactsValid()) return;
 
 	const order = {
-		...orderData,
+		...buyer.getData(),
 		items: basket.getProducts().map(p => p.id),
-		total: basket.getTotal()
+		total: basket.getTotal(),
 	};
 
 	webLarekApi.createOrder(order)
 		.then(result => {
 			basket.clear();
 
-			const success = new Success(
-				cloneTemplate('#success'),
-				events
-			);
-
-			success.total = result.total;
-
 			modal.render({
-				content: success.render({ total: result.total })
+				content: new Success(
+					cloneTemplate('#success'),
+					events
+				).render({ total: result.total }),
 			});
 		})
 		.catch(console.error);
 });
 
+// ================= SUCCESS =================
+
 events.on('order:success-close', () => {
 	modal.close();
-	orderData = {};
+	buyer.clear();
 });
-
-events.on('order:open', () => {
-	modal.render({
-		content: orderForm.render()
-	});
-});
-
-// ================= LOAD DATA =================
-webLarekApi.getProducts()
-	.then(data => catalog.setProducts(data.items))
-	.catch(console.error);

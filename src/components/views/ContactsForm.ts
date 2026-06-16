@@ -1,14 +1,21 @@
 import { Form } from './Form';
 import { IEvents } from '../base/Events';
+import { ensureElement } from '../../utils/utils';
 
 export class ContactsForm extends Form<any> {
-
 	constructor(container: HTMLFormElement, events: IEvents) {
 		super(container, events);
 
 		this.submitButton = container.querySelector('button[type="submit"]')!;
 
-		this.container.addEventListener('input', () => {
+		this.container.addEventListener('input', (e) => {
+			const target = e.target as HTMLInputElement;
+
+			this.events.emit<{ field: string; value: string }>('form:change', {
+				field: target.name,
+				value: target.value,
+			});
+
 			this.updateValidity();
 		});
 
@@ -21,8 +28,8 @@ export class ContactsForm extends Form<any> {
 	}
 
 	private updateValidity() {
-		const email = this.container.querySelector('input[name="email"]') as HTMLInputElement;
-		const phone = this.container.querySelector('input[name="phone"]') as HTMLInputElement;
+		const email = this.container.querySelector<HTMLInputElement>('input[name="email"]')!;
+		const phone = this.container.querySelector<HTMLInputElement>('input[name="phone"]')!;
 
 		const isValid =
 			email.value.trim().length > 0 &&

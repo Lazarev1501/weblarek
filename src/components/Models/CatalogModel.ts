@@ -2,8 +2,8 @@ import { IEvents } from '../base/Events';
 import { IProduct } from '../../types';
 
 export class CatalogModel {
-  protected products: IProduct[] = [];
-  protected selectedProduct: IProduct | null = null;
+  private products: IProduct[] = [];
+  private selectedId: string | null = null;
 
   constructor(private events: IEvents) {}
 
@@ -17,24 +17,15 @@ export class CatalogModel {
   }
 
   getProduct(id: string): IProduct | undefined {
-    return this.products.find((product) => product.id === id);
+    return this.products.find(p => p.id === id);
   }
 
-  setSelectedProduct(product: IProduct): void {
-    this.selectedProduct = product;
-    this.events.emit('catalog:selected', product);
+  select(id: string): void {
+    this.selectedId = id;
+    this.events.emit('catalog:selected', { id });
   }
 
-  selectProduct(id: string): void {
-	const product = this.products.find(item => item.id === id);
-
-	  if (product) {
-		  this.selectedProduct = product;
-		  this.events.emit('catalog:selected', product);
-	  }
+  getSelected(): IProduct | null {
+    return this.products.find(p => p.id === this.selectedId) ?? null;
   }
-
-  getSelectedProduct(): IProduct | null {
-	  return this.selectedProduct;
-}
 }

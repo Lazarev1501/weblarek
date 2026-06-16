@@ -11,7 +11,9 @@ export class BasketModel {
   }
 
   addProduct(product: IProduct): void {
-    this.products.push(product);
+    if (!this.hasProduct(product.id)) {
+      this.products.push(product);
+    }
     this.events.emit('basket:changed');
   }
 
