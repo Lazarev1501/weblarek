@@ -28,4 +28,8 @@ export class CatalogModel {
 	getSelected(): IProduct | null {
 		return this.products.find(p => p.id === this.selectedId) ?? null;
 	}
+
+	getSelectedId(): string | null {
+		return this.selectedId;
+	}
 }

@@ -43,14 +43,10 @@ const modal = new Modal(document.querySelector('#modal-container')!, events);
 
 const basketView = new BasketView(cloneTemplate('#basket'), events);
 
-// ================= FORMS =================
+// ================= FORMS (создаем один раз) =================
 const orderForm = new OrderForm(cloneTemplate('#order'), events);
 const contactsForm = new ContactsForm(cloneTemplate('#contacts'), events);
 const success = new Success(cloneTemplate('#success'), events);
-
-// ================= STATE =================
-let currentPreviewId: string | null = null;
-let previewContainer: HTMLElement | null = null;
 
 // ================= RENDER =================
 
@@ -98,9 +94,11 @@ events.on('basket:changed', () => {
 	renderBasket();
 	header.counter = basket.getCount();
 
-	if (currentPreviewId && previewContainer) {
-		const product = catalog.getProduct(currentPreviewId);
-		if (product) {
+	const previewId = catalog.getSelectedId();
+	if (previewId) {
+		const product = catalog.getProduct(previewId);
+		const previewContainer = document.querySelector('.modal_active .card_full');
+		if (product && previewContainer) {
 			const button = previewContainer.querySelector('.card__button') as HTMLButtonElement;
 			if (button) {
 				button.textContent = basket.hasProduct(product.id) ? 'Удалить из корзины' : 'В корзину';
@@ -123,25 +121,24 @@ events.on<{ id: string }>('catalog:selected', ({ id }) => {
 	const product = catalog.getProduct(id);
 	if (!product) return;
 
-	currentPreviewId = id;
-
 	const preview = new PreviewCard(
 		cloneTemplate('#card-preview'),
 		() => {
-			if (currentPreviewId) {
-				const p = catalog.getProduct(currentPreviewId);
+			const selectedId = catalog.getSelectedId();
+			if (selectedId) {
+				const p = catalog.getProduct(selectedId);
 				if (p) basket.toggleProduct(p);
 			}
 		}
 	);
 
-	previewContainer = preview.render({
+	const container = preview.render({
 		...product,
 		inBasket: basket.hasProduct(product.id),
 	});
 
 	modal.render({
-		content: previewContainer,
+		content: container,
 	});
 });
 
@@ -170,13 +167,11 @@ events.on('order:open', () => {
 // ================= FORM SUBMIT =================
 
 events.on('form:submit', () => {
-	const activeForm = document.querySelector('.modal_active form');
+	const activeForm = document.querySelector('.modal_active form') as HTMLFormElement | null;
 	
 	if (!activeForm) return;
 	
-	const form = activeForm as HTMLFormElement;
-	
-	if (form.name === 'order') {
+	if (activeForm.name === 'order') {
 		if (buyer.isOrderValid()) {
 			modal.render({
 				content: contactsForm.render(),
@@ -184,7 +179,7 @@ events.on('form:submit', () => {
 		} else {
 			events.emit('buyer:changed');
 		}
-	} else if (form.name === 'contacts') {
+	} else if (activeForm.name === 'contacts') {
 		if (buyer.isContactsValid()) {
 			events.emit('order:send');
 		} else {
@@ -259,6 +254,5 @@ events.on('order:success-close', () => {
 // ================= MODAL CLOSE =================
 
 events.on('modal:close', () => {
-	currentPreviewId = null;
-	previewContainer = null;
+	catalog.select('');
 });
