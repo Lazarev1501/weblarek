@@ -35,15 +35,15 @@ export class BuyerModel {
 	}
 
 	setField(field: keyof IBuyer, value: string): void {
-    this.setData({
-      [field]: value
-    } as Partial<IBuyer>);
-  }
+		this.setData({
+			[field]: value
+		} as Partial<IBuyer>);
+	}
 
-  setPayment(payment: TPayment): void {
-    this.payment = payment;
-    this.events.emit('buyer:changed');
-  }
+	setPayment(payment: TPayment): void {
+		this.payment = payment;
+		this.events.emit('buyer:changed');
+	}
 
 	getData(): IBuyer {
 		return {
@@ -86,10 +86,10 @@ export class BuyerModel {
 	}
 
 	isOrderValid(): boolean {
-    return !!this.payment && !!this.address.trim();
-  }
+		return !!this.payment && !!this.address.trim();
+	}
 
-  isContactsValid(): boolean {
-    return !!this.email.trim() && !!this.phone.trim();
-  }
+	isContactsValid(): boolean {
+		return !!this.email.trim() && !!this.phone.trim();
+	}
 }

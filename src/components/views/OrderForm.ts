@@ -5,51 +5,30 @@ import { ensureElement } from '../../utils/utils';
 export class OrderForm extends Form<any> {
 	private cardButton: HTMLButtonElement;
 	private cashButton: HTMLButtonElement;
+	private addressInput: HTMLInputElement;
 
 	constructor(container: HTMLFormElement, events: IEvents) {
 		super(container, events);
 
 		this.cardButton = ensureElement<HTMLButtonElement>('button[name="card"]', container);
 		this.cashButton = ensureElement<HTMLButtonElement>('button[name="cash"]', container);
+		this.addressInput = container.querySelector('[name="address"]') as HTMLInputElement;
 
 		this.cardButton.addEventListener('click', () => {
-			this.setPayment('card');
+			this.events.emit('order:payment', { type: 'card' });
 		});
 
 		this.cashButton.addEventListener('click', () => {
-			this.setPayment('cash');
+			this.events.emit('order:payment', { type: 'cash' });
 		});
-
-		this.container.addEventListener('input', () => {
-			this.updateValidity();
-		});
-
-		this.container.addEventListener('submit', (e) => {
-			e.preventDefault();
-			this.events.emit('order:next');
-		});
-
-		this.updateValidity();
 	}
 
-	private setPayment(type: 'card' | 'cash') {
-		this.cardButton.classList.toggle('button_alt-active', type === 'card');
-		this.cashButton.classList.toggle('button_alt-active', type === 'cash');
-
-		this.events.emit('order:payment', { type });
-
-		this.updateValidity();
+	set payment(value: 'card' | 'cash' | null) {
+		this.cardButton.classList.toggle('button_alt-active', value === 'card');
+		this.cashButton.classList.toggle('button_alt-active', value === 'cash');
 	}
 
-	private updateValidity() {
-		const address = (this.container.querySelector('[name="address"]') as HTMLInputElement).value;
-
-		const hasAddress = address.trim().length > 0;
-
-		const hasPayment =
-			this.cardButton.classList.contains('button_alt-active') ||
-			this.cashButton.classList.contains('button_alt-active');
-
-		this.submitButton.disabled = !(hasAddress && hasPayment);
+	set address(value: string) {
+		this.addressInput.value = value;
 	}
 }

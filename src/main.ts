@@ -25,8 +25,6 @@ import { Success } from './components/views/Success';
 import { cloneTemplate } from './utils/utils';
 import { API_URL } from './utils/constants';
 
-import { IProduct } from './types';
-
 const events = new EventEmitter();
 
 // ================= MODELS =================
@@ -43,13 +41,16 @@ const header = new Header(document.querySelector('.header')!, events);
 const gallery = new Gallery(document.querySelector('.gallery')!);
 const modal = new Modal(document.querySelector('#modal-container')!, events);
 
-const basketView = new BasketView(
-	cloneTemplate('#basket'),
-	events
-);
+const basketView = new BasketView(cloneTemplate('#basket'), events);
+
+// ================= FORMS =================
+const orderForm = new OrderForm(cloneTemplate('#order'), events);
+const contactsForm = new ContactsForm(cloneTemplate('#contacts'), events);
+const success = new Success(cloneTemplate('#success'), events);
 
 // ================= STATE =================
-let currentPreview: IProduct | null = null;
+let currentPreviewId: string | null = null;
+let previewContainer: HTMLElement | null = null;
 
 // ================= RENDER =================
 
@@ -57,26 +58,28 @@ function renderGallery() {
 	const cards = catalog.getProducts().map(product => {
 		const card = new CatalogCard(
 			cloneTemplate('#card-catalog'),
-			events
+			() => catalog.select(product.id)
 		);
-
-		return card.render({
-			...product,
-			inBasket: basket.hasProduct(product.id),
-		});
+		return card.render(product);
 	});
 
 	gallery.catalog = cards;
 }
 
 function renderBasket() {
-	const items = basket.getProducts().map(product => {
+	const items = basket.getProducts().map((product, index) => {
 		const item = new BasketItem(
 			cloneTemplate('#card-basket'),
-			events
+			() => basket.removeById(product.id)
 		);
 
-		return item.render(product);
+		const element = item.render(product);
+		const indexElement = element.querySelector('.basket__item-index');
+		if (indexElement) {
+			indexElement.textContent = String(index + 1);
+		}
+
+		return element;
 	});
 
 	basketView.items = items;
@@ -91,64 +94,55 @@ webLarekApi.getProducts()
 
 // ================= GLOBAL SYNC =================
 
-// 🔥 ЕДИНЫЙ источник обновления UI
 events.on('basket:changed', () => {
 	renderBasket();
-	renderGallery();
 	header.counter = basket.getCount();
+
+	if (currentPreviewId && previewContainer) {
+		const product = catalog.getProduct(currentPreviewId);
+		if (product) {
+			const button = previewContainer.querySelector('.card__button') as HTMLButtonElement;
+			if (button) {
+				button.textContent = basket.hasProduct(product.id) ? 'Удалить из корзины' : 'В корзину';
+			}
+		}
+	}
 });
 
 // ================= CATALOG =================
 
 events.on('catalog:changed', renderGallery);
 
-// ================= CARD =================
+// ================= CARD SELECT =================
 
 events.on<{ id: string }>('card:select', ({ id }) => {
+	catalog.select(id);
+});
+
+events.on<{ id: string }>('catalog:selected', ({ id }) => {
 	const product = catalog.getProduct(id);
 	if (!product) return;
 
-	currentPreview = product;
+	currentPreviewId = id;
 
 	const preview = new PreviewCard(
 		cloneTemplate('#card-preview'),
-		events
+		() => {
+			if (currentPreviewId) {
+				const p = catalog.getProduct(currentPreviewId);
+				if (p) basket.toggleProduct(p);
+			}
+		}
 	);
 
-	modal.render({
-		content: preview.render({
-			...product,
-			inBasket: basket.hasProduct(product.id),
-		}),
+	previewContainer = preview.render({
+		...product,
+		inBasket: basket.hasProduct(product.id),
 	});
-});
 
-// ================= BASKET TOGGLE =================
-
-events.on<{ id: string }>('basket:toggle', ({ id }) => {
-	const product = catalog.getProduct(id);
-	if (!product) return;
-
-	if (basket.hasProduct(id)) {
-		basket.removeById(id);
-	} else {
-		basket.addProduct(product);
-	}
-
-	// обновляем preview если открыт
-	if (currentPreview) {
-		const preview = new PreviewCard(
-			cloneTemplate('#card-preview'),
-			events
-		);
-
-		modal.render({
-			content: preview.render({
-				...currentPreview,
-				inBasket: basket.hasProduct(currentPreview.id),
-			}),
-		});
-	}
+	modal.render({
+		content: previewContainer,
+	});
 });
 
 // ================= BASKET OPEN =================
@@ -159,7 +153,7 @@ events.on('basket:open', () => {
 	});
 });
 
-// ================= REMOVE =================
+// ================= BASKET REMOVE =================
 
 events.on<{ id: string }>('basket:remove', ({ id }) => {
 	basket.removeById(id);
@@ -169,23 +163,37 @@ events.on<{ id: string }>('basket:remove', ({ id }) => {
 
 events.on('order:open', () => {
 	modal.render({
-		content: new OrderForm(
-			cloneTemplate('#order'),
-			events
-		).render(),
+		content: orderForm.render(),
 	});
 });
 
-events.on('order:next', () => {
-	modal.render({
-		content: new ContactsForm(
-			cloneTemplate('#contacts'),
-			events
-		).render(),
-	});
+// ================= FORM SUBMIT =================
+
+events.on('form:submit', () => {
+	const activeForm = document.querySelector('.modal_active form');
+	
+	if (!activeForm) return;
+	
+	const form = activeForm as HTMLFormElement;
+	
+	if (form.name === 'order') {
+		if (buyer.isOrderValid()) {
+			modal.render({
+				content: contactsForm.render(),
+			});
+		} else {
+			events.emit('buyer:changed');
+		}
+	} else if (form.name === 'contacts') {
+		if (buyer.isContactsValid()) {
+			events.emit('order:send');
+		} else {
+			events.emit('buyer:changed');
+		}
+	}
 });
 
-// ================= FORM =================
+// ================= FORM CHANGE =================
 
 events.on<{ field: string; value: string }>('form:change', ({ field, value }) => {
 	buyer.setField(field as any, value);
@@ -195,6 +203,29 @@ events.on<{ field: string; value: string }>('form:change', ({ field, value }) =>
 
 events.on<{ type: 'card' | 'cash' }>('order:payment', ({ type }) => {
 	buyer.setPayment(type);
+});
+
+// ================= BUYER CHANGED =================
+
+events.on('buyer:changed', () => {
+	const data = buyer.getData();
+	const errors = buyer.validate();
+
+	// OrderForm
+	orderForm.payment = data.payment;
+	orderForm.address = data.address;
+
+	const orderErrors = [errors.payment, errors.address].filter(Boolean).join('; ');
+	orderForm.errors = orderErrors;
+	orderForm.valid = !orderErrors.length;
+
+	// ContactsForm
+	contactsForm.email = data.email;
+	contactsForm.phone = data.phone;
+
+	const contactsErrors = [errors.email, errors.phone].filter(Boolean).join('; ');
+	contactsForm.errors = contactsErrors;
+	contactsForm.valid = !contactsErrors.length;
 });
 
 // ================= ORDER SEND =================
@@ -211,12 +242,8 @@ events.on('order:send', () => {
 	webLarekApi.createOrder(order)
 		.then(result => {
 			basket.clear();
-
 			modal.render({
-				content: new Success(
-					cloneTemplate('#success'),
-					events
-				).render({ total: result.total }),
+				content: success.render({ total: result.total }),
 			});
 		})
 		.catch(console.error);
@@ -227,4 +254,11 @@ events.on('order:send', () => {
 events.on('order:success-close', () => {
 	modal.close();
 	buyer.clear();
+});
+
+// ================= MODAL CLOSE =================
+
+events.on('modal:close', () => {
+	currentPreviewId = null;
+	previewContainer = null;
 });

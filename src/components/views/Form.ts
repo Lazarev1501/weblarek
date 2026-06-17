@@ -13,11 +13,7 @@ export abstract class Form<T> extends Component<T> {
 
 		this.container.addEventListener('input', (e) => {
 			const target = e.target as HTMLInputElement;
-
-			this.events.emit('form:change', {
-				field: target.name,
-				value: target.value
-			});
+			this.events.emit('form:change', { field: target.name, value: target.value });
 		});
 
 		this.container.addEventListener('submit', (e) => {
